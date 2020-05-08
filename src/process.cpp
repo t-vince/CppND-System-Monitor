@@ -4,30 +4,45 @@
 #include <string>
 #include <vector>
 
+#include "linux_parser.h"
 #include "process.h"
 
 using std::string;
 using std::to_string;
 using std::vector;
 
-// TODO: Return this process's ID
-int Process::Pid() { return 0; }
+Process::Process(int pid) : pid_(pid) {
+    if (pid_ < 0)
+        throw std::invalid_argument("A process ID can not be negative");
+    user_ = LinuxParser::User(pid_);
+    command_ = LinuxParser::Command(pid_);
+    Update();
+}
 
-// TODO: Return this process's CPU utilization
-float Process::CpuUtilization() { return 0; }
+int Process::Pid() const { return pid_; }
 
-// TODO: Return the command that generated this process
-string Process::Command() { return string(); }
+// Return this process's CPU utilization
+float Process::CpuUtilization() const { return cpu_utilization_; }
 
-// TODO: Return this process's memory utilization
-string Process::Ram() { return string(); }
+void Process::Update() {
+    uptime_ = LinuxParser::UpTime(pid_);
+    float total_cpu_time = LinuxParser::ActiveJiffies(pid_) / sysconf(_SC_CLK_TCK);
+    // Note: ncurses_display already multiplies by 100
+    cpu_utilization_ = total_cpu_time / uptime_;
+}
 
-// TODO: Return the user (name) that generated this process
-string Process::User() { return string(); }
+string Process::Command() const { return command_; }
 
-// TODO: Return the age of this process (in seconds)
-long int Process::UpTime() { return 0; }
+// Return this process's memory utilization
+string Process::Ram() const { return LinuxParser::Ram(pid_); }
 
-// TODO: Overload the "less than" comparison operator for Process objects
-// REMOVE: [[maybe_unused]] once you define the function
-bool Process::operator<(Process const& a[[maybe_unused]]) const { return true; }
+string Process::User() const { return user_; }
+
+// Return the age of this process (in seconds)
+long int Process::UpTime() const { return uptime_; }
+
+// Overload the "less than" comparison operator for Process objects
+// Order by cpu utilization
+bool Process::operator<(Process const& a) const { 
+    return CpuUtilization() < a.CpuUtilization();
+}
